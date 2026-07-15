@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Env / secrets
+.env
+!.env.example
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Chroma / vector store persistence
+backend/data/chroma/
+
+# SQLite
+*.db
+*.sqlite3
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+DEMO_SCRIPT.md
+HOVER_WALKTHROUGH_SCRIPT.md
+PRD.md
+arch.md

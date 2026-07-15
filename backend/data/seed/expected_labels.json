@@ -1,0 +1,12 @@
+{
+  "ADM001": "DISPUTE",
+  "ADM002": "PAY",
+  "ADM003": "DISPUTE",
+  "ADM004": "PAY",
+  "ADM005": "DISPUTE",
+  "ADM006": "ESCALATE",
+  "ADM007": "PAY",
+  "ADM008": "DISPUTE",
+  "ADM009": "DISPUTE",
+  "ADM010": "ESCALATE"
+}
