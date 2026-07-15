@@ -1,32 +1,38 @@
-# React + TypeScript + Vite
+# adm-defender — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + Tailwind 4 + Vite UI for the ADM Defense Agent.
 
-Currently, two official plugins are available:
+## What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+A three-panel interface that lets a user review inbound ADMs and run the agent against them:
 
-## React Compiler
+- **AdmSidebar** — list of all ADMs with status badges
+- **AdmNoticePanel** — raw ADM detail + joined PNR record
+- **AgentPanel** — "Run Agent" button, live decision badge (DISPUTE / PAY / ESCALATE), and the output artifact with copy-to-clipboard
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech
 
-## Expanding the Oxlint configuration
+- React 19 with TypeScript
+- Tailwind 4 for styling
+- Vite for dev server and build
+- Plain `fetch` for API calls via `lib/api.ts`
+- No state library — component-local state is sufficient at this scale
+- No auth/login — not in scope for the demo
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Available Scripts
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install       # install dependencies
+npm run dev       # start dev server (default :5173)
+npm run build     # production build
+npm run preview   # preview production build
+npm run lint      # run oxlint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Backend connection
+
+The dev server proxies `/api` requests to `http://localhost:8000` (configured in `vite.config.ts`). The backend must be running locally for the UI to function.
+
+## What's wired vs. not
+
+The synchronous `POST /agent/run/{adm_id}` endpoint is wired into the UI. A WebSocket endpoint (`WS /ws/agent/{adm_id}`) exists on the backend for live step-by-step streaming but is not yet connected in the frontend — that's the natural next enhancement.
