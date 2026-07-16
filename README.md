@@ -1,114 +1,162 @@
-# adm-defender
+<div align="center">
 
-**ADM Defense Agent** — an autonomous agent that handles airline Agency Debit Memos (ADMs) by deciding whether to dispute, pay, or escalate each case — with a hard code-enforced boundary for when it must defer to a human.
+# ✈️ ADM Defense Agent
 
-[▶ Watch the demo](https://drive.google.com/file/d/1o51QL0Luybmteu13k9QC4S9N8YnOKv2e/view?usp=drive_link)
+**An autonomous agent that defends travel agencies against airline fines — and knows when not to.**
 
-Built for the Tabhi / Mondee internal operations use case: ~65,000 travel agents, ~$269 average ADM, 14-day dispute window. At that scale, ADMs are a direct P&L leak, not a UX nicety.
+Parses incoming Agency Debit Memos, verifies the airline's claim against the actual booking and published fare rules, then decides `DISPUTE` / `PAY` / `ESCALATE` — with every decision routed to a human reviewer by email before anything ships.
 
-## Problem
+[![LangGraph](https://img.shields.io/badge/LangGraph-state%20machine-1c3c3c?logo=langchain&logoColor=white)](https://github.com/langchain-ai/langgraph)
+[![FastAPI](https://img.shields.io/badge/FastAPI-WebSocket%20streaming-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React%2019-live%20timeline-61dafb?logo=react&logoColor=black)](https://react.dev/)
+[![RAG](https://img.shields.io/badge/RAG-Chroma%20%2B%20BGE-ff6f61)](https://www.trychroma.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Airlines issue ADMs to travel agencies when they detect ticketing errors — wrong fare calculation, rule violations, under-collected taxes, bad refunds. Every ADM either drains margin (if paid) or eats human hours (if disputed manually). This agent automates the dispute-or-pay decision.
+[**▶ Watch the demo**](https://drive.google.com/file/d/1o51QL0Luybmteu13k9QC4S9N8YnOKv2e/view?usp=drive_link)
 
-## What it does
+</div>
 
-Given an incoming ADM notice, the agent:
+---
 
-1. Parses the ADM (ticket number, reason code, amount, deadline)
-2. Pulls the PNR / booking record
-3. Retrieves the relevant fare rule via RAG over real airline fare rule docs
-4. Runs three deterministic verification tools (advance-purchase check, booking-class check, tax recalculation)
-5. Reasons about whether the booking violates the cited rule
-6. Decides one of: `DISPUTE` / `PAY` / `ESCALATE_TO_HUMAN`
-7. Generates the appropriate output artifact
+![Agent running — live step timeline](docs/screenshot-run-timeline.png)
+<p align="center"><em>The agent thinking in real time — each LangGraph node streams over WebSocket as it runs.</em></p>
 
-A hard decision boundary (amount > $500, confidence < 0.70, no strong rule match → ESCALATE) is enforced in code, not left to the LLM.
+## The problem
 
-## Architecture
+Airlines issue **Agency Debit Memos** when they detect ticketing errors — fare calculation mistakes, rule violations, under-collected taxes. A mid-size consolidator sees thousands per month at ~$269 average, each with a **14-day dispute window**. Every ADM either drains margin (paid without checking) or eats analyst hours (disputed manually). At scale this is a direct P&L leak.
+
+The agent automates the *verification and drafting* work — and hands the final call to a human.
+
+## How a run works
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    ADM Defense Agent                     │
-│                                                          │
-│   [ADM notice]                                           │
-│        │                                                 │
-│        ▼                                                 │
-│   ┌─────────────────────────────────────────────────┐    │
-│   │           LangGraph State Machine               │    │
-│   │   parse_adm → lookup_booking → retrieve_rule    │    │
-│   │        → verify_calculation → analyze           │    │
-│   │            │                                    │    │
-│   │            ├─→ DISPUTE  → draft_letter          │    │
-│   │            ├─→ PAY      → draft_pay_auth        │    │
-│   │            └─→ ESCALATE → open_case             │    │
-│   └─────────────────────────────────────────────────┘    │
-│        │                                                 │
-│        ▼                                                 │
-│   [Output artifact + streamed reasoning trace]           │
-└──────────────────────────────────────────────────────────┘
+parse_adm → lookup_booking → retrieve_rule → verify_calculation → analyze
+     ├─→ DISPUTE  → draft_letter      ┐
+     ├─→ PAY      → draft_pay_auth    ├─→ submit_decision → notify_reviewer
+     └─→ ESCALATE → open_case         ┘
 ```
+
+1. **Parse** the ADM — ticket number, reason code, amount, deadline
+2. **Pull the PNR** — the actual booking record the airline is claiming against
+3. **Retrieve the fare rule** — RAG over the airline's published fare rules (Chroma + BGE embeddings, filtered by airline)
+4. **Verify deterministically** — advance-purchase math, booking-class match, tax recalculation. Real checks in code, not LLM eyeballing
+5. **Reason** — the model weighs the claim against retrieved rules and verification results
+6. **Draft the artifact** — a BSPLink-ready dispute letter, a pay-authorization memo, or an escalation case file
+7. **Log** the decision with its full evidence trail (SQLite audit log)
+8. **Email the human reviewer** — decision, evidence, drafted artifact, and one-click action links
+
+### The decision boundary is code, not a prompt
+
+```python
+if amount_claimed > $500:        → ESCALATE
+if confidence < 0.70:            → ESCALATE
+if no strong fare-rule match:    → ESCALATE
+```
+
+These overrides run *after* the LLM call, in plain Python. The model cannot talk its way past them.
+
+![Decision card with reviewer status](docs/screenshot-decision.png)
+<p align="center"><em>DISPUTE at 95% confidence, drafted letter ready, reviewer emailed — awaiting their click.</em></p>
+
+## Human-in-the-loop by design
+
+Every decision emails a reviewer **before anything is submitted anywhere**. Routing depends on decision type:
+
+| Decision | Goes to | Why |
+|---|---|---|
+| `DISPUTE` | Ops team lead | Reviews the letter before BSPLink submission |
+| `PAY` | Finance manager | Signs off before money moves |
+| `ESCALATE` | Senior analyst | Takes ownership of the ambiguous case |
+
+The email carries the full evidence package and **Approve / Reject / Request-info** links that hit the backend directly — the UI polls and reflects the reviewer's action within 3 seconds. The agent does the work; the human owns the decision.
 
 ## Tech stack
 
 | Layer | Choice |
 |---|---|
-| LLM | OpenRouter (`nvidia/nemotron-3-ultra-550b-a55b:free`) via OpenAI SDK |
-| Agent framework | LangGraph (`StateGraph`) |
-| Backend | FastAPI + WebSocket |
-| RAG | Chroma + BGE-small embeddings via fastembed |
-| Database | SQLite |
+| Agent framework | LangGraph (`StateGraph`, conditional edges, custom stream events) |
+| LLM | Groq (`llama-3.3-70b-versatile`) — OpenRouter switchable via one env var |
+| Backend | FastAPI + WebSocket streaming |
+| RAG | Chroma + BGE-small embeddings (fastembed), metadata-filtered by airline |
+| Reviewer email | SMTP + Jinja2 templates (one per decision type) |
+| Database | SQLite (bookings, ADMs, decision audit log) |
 | Frontend | React 19 + Tailwind 4 + Vite |
 | Fare rule corpus | 5 hand-authored Markdown docs (AA, EY, NH, AI, EK) |
+
+## Quickstart
+
+**Backend**
+
+```bash
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env            # then fill it in — see table below
+python -m app.db.seed           # create + seed SQLite
+python -m app.rag.ingest        # build the Chroma fare-rule index
+uvicorn app.main:app --reload   # http://localhost:8000
+```
+
+**Frontend**
+
+```bash
+cd frontend
+npm install
+npm run dev                     # http://localhost:5173
+```
+
+**Environment variables** (`backend/.env`)
+
+| Variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` / `OPENROUTER_API_KEY` | LLM provider key (set the one you use) |
+| `LLM_PROVIDER` | `groq` or `openrouter` |
+| `MODEL` | Model id, relative to the active provider |
+| `SMTP_USER` / `SMTP_PASSWORD` | Gmail address + [App Password](https://myaccount.google.com/apppasswords) for reviewer email |
+| `FROM_EMAIL` | Sender address |
+| `OPS_REVIEWER_EMAIL` / `FINANCE_REVIEWER_EMAIL` / `SENIOR_ANALYST_EMAIL` | Reviewer inboxes per decision type (one address for all three is fine for a demo) |
+| `BACKEND_PUBLIC_URL` | Base URL for the approve/reject links in emails |
+
+Email is optional — with SMTP unconfigured, runs still complete and log decisions; the notify step just reports a non-fatal warning.
+
+## API
+
+```
+GET  /health                            liveness
+GET  /adm                               list all ADMs
+GET  /adm/{adm_id}                      ADM + joined PNR
+POST /agent/run/{adm_id}                full synchronous run
+WS   /ws/agent/{adm_id}                 stream agent steps live
+GET  /decision/{decision_id}            fetch a decision (UI polls this)
+GET  /decision/{decision_id}/approve    reviewer action — from the email
+GET  /decision/{decision_id}/reject     reviewer action — from the email
+GET  /decision/{decision_id}/request_info
+```
 
 ## Repo structure
 
 ```
 ├── backend/
-│   ├── app/              # FastAPI app + LangGraph agent
-│   ├── data/             # Fare rule corpus, seed data
-│   ├── tests/            # Pytest suite
-│   └── requirements.txt
+│   ├── app/
+│   │   ├── agent/        # LangGraph nodes, graph, LLM client, email notify + templates
+│   │   ├── rag/          # Chroma ingest + retrieval
+│   │   ├── db/           # schema, seed, connection
+│   │   └── routers/      # adm / agent / decision endpoints
+│   ├── data/             # fare rule corpus, seed data
+│   └── tests/
 ├── frontend/
-│   ├── src/              # React + Tailwind UI
-│   └── package.json
-├── PRD.md                # Full product spec
-└── arch.md               # Architecture deep-dive
+│   └── src/              # React UI — sidebar, memo panel, agent timeline
+└── docs/                 # screenshots
 ```
 
 ## Seed data
 
-10 mock ADMs across 5 airlines — 5 disputable, 3 legitimate (should PAY), 2 ambiguous (should ESCALATE). This distribution proves the agent has real judgment, not a reflex to dispute everything.
-
-## Decision boundary
-
-```
-if amount_claimed > $500:              → ESCALATE
-if agent_confidence < 0.70:            → ESCALATE
-if no strong rule match:               → ESCALATE
-else:                                  → DISPUTE or PAY
-```
-
-These checks are applied *after* the LLM call, in plain Python — the model cannot talk its way past them.
+10 mock ADMs across 5 airlines — 5 disputable, 3 legitimate (should PAY), 2 ambiguous (should ESCALATE). The distribution matters: it proves the agent exercises judgment instead of reflexively disputing everything. The full 10/10 eval runs with `python -m app.eval_seed`.
 
 ## What's real vs. simulated
 
-- **Simulated**: fare rule corpus is hand-authored (not scraped PDFs); BSPLink submission is not integrated; tax table is hardcoded.
-- **Real**: LangGraph state machine, RAG pipeline (real embeddings, real vector search, real metadata filtering), LLM calls against a real hosted model via OpenRouter, decision boundary logic, SQLite audit trail.
-
-## API
-
-```
-GET  /health                       liveness
-GET  /adm                          list all ADMs
-GET  /adm/{adm_id}                 ADM + joined PNR
-POST /agent/run/{adm_id}           full synchronous run
-GET  /decision/{decision_id}       fetch a past decision
-WS   /ws/agent/{adm_id}            stream agent steps live
-```
-
-## Alternative considered
-
-OpenAI Assistants/Responses API tool-calling loop instead of LangGraph. LangGraph was chosen for the explicit state machine visualization; the native OpenAI tool-calling loop is a viable alternative noted here to signal awareness of the landscape.
+- **Real**: the LangGraph state machine, RAG pipeline (real embeddings, vector search, metadata filtering), live LLM calls, deterministic verification tools, decision boundary, SQLite audit trail, SMTP email with working approve/reject round-trip.
+- **Simulated**: fare rule corpus is hand-authored (not scraped filings); BSPLink submission is not integrated; the tax table is hardcoded.
 
 ## License
 

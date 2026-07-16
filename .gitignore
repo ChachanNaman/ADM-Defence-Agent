@@ -26,7 +26,13 @@ backend/data/chroma/
 .DS_Store
 .vscode/
 .idea/
+
+# Logs
+*.log
+
+# Internal working docs — not part of the public repo
 DEMO_SCRIPT.md
 HOVER_WALKTHROUGH_SCRIPT.md
 PRD.md
+PRD_v2.md
 arch.md
