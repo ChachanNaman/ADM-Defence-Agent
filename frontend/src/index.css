@@ -1,1 +1,78 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+}
+
+/* ---- Motion: deliberately restrained. Everything under 700ms, ease-out. ---- */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Bar animates from 0 to its inline width — `to` is implicit. */
+@keyframes grow-bar {
+  from {
+    width: 0%;
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.45s ease-out both;
+}
+
+.animate-pop-in {
+  animation: pop-in 0.35s ease-out both;
+}
+
+.animate-grow-bar {
+  animation: grow-bar 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-pop-in,
+  .animate-grow-bar,
+  .animate-pulse-soft {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
