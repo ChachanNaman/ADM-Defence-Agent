@@ -37,3 +37,17 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 ESCALATE_ABOVE_AMOUNT = 500.0
 ESCALATE_BELOW_CONFIDENCE = 0.70
 ESCALATE_BELOW_RETRIEVAL_SCORE = 0.45
+
+# PRD v2 change 2 — human-in-the-loop reviewer email
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
+
+OPS_REVIEWER_EMAIL = os.getenv("OPS_REVIEWER_EMAIL")
+FINANCE_REVIEWER_EMAIL = os.getenv("FINANCE_REVIEWER_EMAIL")
+SENIOR_ANALYST_EMAIL = os.getenv("SENIOR_ANALYST_EMAIL")
+
+# Used to build the [Approve] [Reject] [Request more info] links in reviewer emails.
+BACKEND_PUBLIC_URL = os.getenv("BACKEND_PUBLIC_URL", "http://localhost:8000")

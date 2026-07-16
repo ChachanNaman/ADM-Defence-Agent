@@ -31,6 +31,8 @@ export interface ADM extends ADMListItem {
 
 export type Decision = 'DISPUTE' | 'PAY' | 'ESCALATE'
 
+export type ReviewerAction = 'approved' | 'rejected' | 'request_info'
+
 export interface DecisionRecord {
   decision_id: string
   adm_id: string
@@ -39,4 +41,35 @@ export interface DecisionRecord {
   evidence_json: string
   output_artifact: string
   timestamp: string
+  reviewer_action: ReviewerAction | null
+  reviewer_action_at: string | null
 }
+
+export type AgentStepKey =
+  | 'parse_adm'
+  | 'lookup_booking'
+  | 'retrieve_rule'
+  | 'verify_calculation'
+  | 'analyze'
+  | 'generate_output'
+  | 'submit_decision'
+  | 'notify_reviewer'
+
+export type StepState = 'pending' | 'running' | 'complete'
+
+export interface StepStatus {
+  state: StepState
+  summary?: string
+}
+
+export interface TraceEvent {
+  step: string
+  message: string
+  data: Record<string, unknown>
+}
+
+export type WsAgentMessage =
+  | { type: 'step_start'; node: string }
+  | { type: 'step'; node: string; events: TraceEvent[] }
+  | { type: 'done'; decision_id: string }
+  | { type: 'error'; message: string }

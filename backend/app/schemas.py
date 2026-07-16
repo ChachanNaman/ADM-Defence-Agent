@@ -47,3 +47,5 @@ class DecisionOut(BaseModel):
     evidence_json: str
     output_artifact: str
     timestamp: str
+    reviewer_action: str | None = None
+    reviewer_action_at: str | None = None

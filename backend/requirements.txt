@@ -30,6 +30,7 @@ httpx==0.28.1
 huggingface_hub==1.23.0
 idna==3.18
 importlib_resources==7.1.0
+jinja2==3.1.6
 jiter==0.16.0
 jsonpatch==1.33
 jsonpointer==3.1.1
@@ -46,6 +47,7 @@ langgraph-sdk==0.4.2
 langsmith==0.10.5
 loguru==0.7.3
 markdown-it-py==4.2.0
+MarkupSafe==3.0.3
 mdurl==0.1.2
 mmh3==5.2.1
 multidict==6.7.1

@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<body style="font-family: monospace, monospace; font-size: 13px; color: #1a1a1a; max-width: 680px;">
+<p>------------------<br>
+DECISION: {{ decision }}<br>
+CONFIDENCE: {{ confidence_pct }}%<br>
+ADM ID: {{ adm_id }}<br>
+DISPUTE DEADLINE: {{ deadline }}<br>
+------------------</p>
+
+<p><strong>CLAIM</strong><br>
+{{ reason_text }}</p>
+
+<p><strong>BOOKING RECORD</strong><br>
+{% if pnr %}
+Fare basis: {{ pnr.fare_basis_code }}<br>
+Class: {{ pnr.booking_class }}<br>
+Route: {{ pnr.origin }} &rarr; {{ pnr.destination }}<br>
+Fare: ${{ '%.2f'|format(pnr.fare_amount) }}&nbsp;&nbsp;&nbsp;Taxes: ${{ '%.2f'|format(pnr.taxes) }}<br>
+Booked: {{ pnr.booking_date }}&nbsp;&nbsp;&nbsp;Departs: {{ pnr.departure_date }}
+{% else %}
+No PNR on file for this ticket number.
+{% endif %}</p>
+
+<p><strong>EVIDENCE</strong><br>
+- Advance purchase check: {{ advance_purchase_result }}<br>
+- Class match check: {{ class_match_result }}<br>
+- Tax calculation check: {{ tax_check_result }}<br>
+- Rule retrieved: {{ top_rule_chunk_id }} (similarity: {{ top_similarity }})</p>
+
+<p><strong>REASONING</strong><br>
+{{ model_reasoning }}</p>
+
+<p>------------------<br>
+<strong>RECOMMENDED ACTION</strong><br>
+This case requires human judgment. Reason for escalation: {{ escalation_reason }}. Full case file below.<br>
+------------------</p>
+
+<pre style="white-space: pre-wrap; background: #f4f4f4; border: 1px solid #ddd; padding: 12px;">{{ output_artifact }}</pre>
+
+<p>
+<a href="{{ approve_url }}">[Approve]</a>&nbsp;&nbsp;
+<a href="{{ reject_url }}">[Reject]</a>&nbsp;&nbsp;
+<a href="{{ request_info_url }}">[Request more info]</a>
+</p>
+</body>
+</html>

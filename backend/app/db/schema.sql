@@ -32,5 +32,7 @@ CREATE TABLE IF NOT EXISTS decision_log (
     confidence REAL NOT NULL,
     evidence_json TEXT NOT NULL,
     output_artifact TEXT NOT NULL,
-    timestamp TEXT NOT NULL
+    timestamp TEXT NOT NULL,
+    reviewer_action TEXT DEFAULT NULL,
+    reviewer_action_at TEXT DEFAULT NULL
 );

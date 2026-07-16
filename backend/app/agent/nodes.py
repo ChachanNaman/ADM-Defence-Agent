@@ -3,9 +3,12 @@
 import json
 from typing import Literal
 
+from langgraph.config import get_stream_writer
+
 from app.agent import tools
 from app.agent.drafting import draft_dispute_letter, draft_pay_auth, escalate_to_human
 from app.agent.llm import complete_json
+from app.agent.notify import EmailSendError, send_reviewer_email
 from app.agent.state import AgentState
 from app.config import (
     ESCALATE_ABOVE_AMOUNT,
@@ -59,6 +62,7 @@ Respond with ONLY a single JSON object and nothing else:
 
 
 def parse_adm(state: AgentState) -> dict:
+    get_stream_writer()({"node": "parse_adm"})
     adm = tools.get_adm(state["adm_id"])
     if adm is None:
         raise ValueError(f"ADM {state['adm_id']} not found")
@@ -77,6 +81,7 @@ def parse_adm(state: AgentState) -> dict:
 
 
 def lookup_booking(state: AgentState) -> dict:
+    get_stream_writer()({"node": "lookup_booking"})
     pnr = tools.lookup_booking(state["adm"]["ticket_number"])
     if pnr is None:
         message = f"No PNR found for ticket {state['adm']['ticket_number']}."
@@ -93,6 +98,7 @@ def lookup_booking(state: AgentState) -> dict:
 
 
 def retrieve_rule(state: AgentState) -> dict:
+    get_stream_writer()({"node": "retrieve_rule"})
     adm, pnr = state["adm"], state.get("pnr")
     fare_basis = pnr["fare_basis_code"] if pnr else None
     chunks = retrieve_fare_rule(
@@ -123,11 +129,22 @@ def retrieve_rule(state: AgentState) -> dict:
     return {
         "rule_chunks": serialized,
         "retrieval_score": top_score,
-        "trace": [{"step": "retrieve_rule", "message": message, "data": {"top_score": top_score}}],
+        "trace": [
+            {
+                "step": "retrieve_rule",
+                "message": message,
+                "data": {
+                    "top_score": top_score,
+                    "n_chunks": len(chunks),
+                    "airline_code": adm["airline_code"],
+                },
+            }
+        ],
     }
 
 
 def verify_calculation(state: AgentState) -> dict:
+    get_stream_writer()({"node": "verify_calculation"})
     pnr = state.get("pnr")
     if pnr is None:
         verification = {
@@ -168,6 +185,7 @@ def verify_calculation(state: AgentState) -> dict:
 
 
 def analyze(state: AgentState) -> dict:
+    get_stream_writer()({"node": "analyze"})
     adm, pnr = state["adm"], state.get("pnr")
     rule_chunks = state.get("rule_chunks", [])
     retrieval_score = state.get("retrieval_score", 0.0)
@@ -256,6 +274,7 @@ def _build_evidence(state: AgentState) -> dict:
 
 
 def draft_letter(state: AgentState) -> dict:
+    get_stream_writer()({"node": "draft_letter"})
     evidence = _build_evidence(state)
     letter = draft_dispute_letter(state["adm"], state.get("pnr"), evidence)
     return {
@@ -266,6 +285,7 @@ def draft_letter(state: AgentState) -> dict:
 
 
 def draft_pay_auth_node(state: AgentState) -> dict:
+    get_stream_writer()({"node": "draft_pay_auth"})
     evidence = _build_evidence(state)
     memo = draft_pay_auth(state["adm"], state.get("pnr"), evidence)
     return {
@@ -276,6 +296,7 @@ def draft_pay_auth_node(state: AgentState) -> dict:
 
 
 def open_case(state: AgentState) -> dict:
+    get_stream_writer()({"node": "open_case"})
     evidence = _build_evidence(state)
     reason = state.get("escalation_reason") or "requires human review"
     ticket = escalate_to_human(state["adm"], state.get("pnr"), evidence, reason)
@@ -287,6 +308,7 @@ def open_case(state: AgentState) -> dict:
 
 
 def submit_decision(state: AgentState) -> dict:
+    get_stream_writer()({"node": "submit_decision"})
     decision_id = tools.submit_decision(
         adm_id=state["adm_id"],
         decision=state["decision"],
@@ -298,3 +320,23 @@ def submit_decision(state: AgentState) -> dict:
         "decision_id": decision_id,
         "trace": [{"step": "submit_decision", "message": f"Logged decision {decision_id}.", "data": {"decision_id": decision_id}}],
     }
+
+
+def notify_reviewer(state: AgentState) -> dict:
+    get_stream_writer()({"node": "notify_reviewer"})
+    try:
+        result = send_reviewer_email(
+            decision=state["decision"],
+            adm=state["adm"],
+            pnr=state.get("pnr"),
+            evidence=state.get("evidence", {}),
+            output_artifact=state.get("output_artifact", ""),
+            confidence=state["confidence"],
+            decision_id=state["decision_id"],
+        )
+        message = f"Email sent to {result['sent_to']}"
+        data = {"sent_to": result["sent_to"], "message_id": result["message_id"]}
+    except EmailSendError as exc:
+        message = f"Email notification failed (non-fatal): {exc}"
+        data = {"error": str(exc)}
+    return {"trace": [{"step": "notify_reviewer", "message": message, "data": data}]}

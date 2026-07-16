@@ -28,9 +28,10 @@ def run_agent(adm_id: str, conn: sqlite3.Connection = Depends(get_db)):
 
 @router.websocket("/ws/agent/{adm_id}")
 async def ws_run_agent(websocket: WebSocket, adm_id: str):
-    """Streams one message per completed graph node — the demo's live tool-call
-    timeline (PRD section 8). Runs the blocking LangGraph stream in a worker
-    thread and bridges each chunk back onto the event loop via a queue."""
+    """Streams normalized step_start/step/done events straight from
+    stream_agent — the demo's live tool-call timeline (PRD v2 change 1).
+    Runs the blocking LangGraph stream in a worker thread and bridges each
+    chunk back onto the event loop via a queue."""
     await websocket.accept()
 
     loop = asyncio.get_event_loop()
@@ -57,15 +58,9 @@ async def ws_run_agent(websocket: WebSocket, adm_id: str):
                 await websocket.send_json({"type": "error", "message": update["__error__"]})
                 break
 
-            (node_name, delta), = update.items()
-            trace_events = delta.pop("trace", [])
-            await websocket.send_json(
-                {"type": "step", "node": node_name, "events": trace_events}
-            )
-            if node_name == "submit_decision":
-                await websocket.send_json(
-                    {"type": "done", "decision_id": delta.get("decision_id")}
-                )
+            await websocket.send_json(update)
+            if update.get("type") == "done":
+                break
     except WebSocketDisconnect:
         return
     finally:

@@ -32,10 +32,22 @@ def get_db():
         conn.close()
 
 
+def _ensure_reviewer_columns(conn: sqlite3.Connection) -> None:
+    """PRD v2 change 2 — decision_log predates the reviewer_action columns,
+    so CREATE TABLE IF NOT EXISTS won't retrofit them onto an existing db."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(decision_log)").fetchall()}
+    if "reviewer_action" not in columns:
+        conn.execute("ALTER TABLE decision_log ADD COLUMN reviewer_action TEXT DEFAULT NULL")
+    if "reviewer_action_at" not in columns:
+        conn.execute("ALTER TABLE decision_log ADD COLUMN reviewer_action_at TEXT DEFAULT NULL")
+    conn.commit()
+
+
 def init_db() -> None:
     conn = get_connection()
     try:
         conn.executescript(SCHEMA_PATH.read_text())
         conn.commit()
+        _ensure_reviewer_columns(conn)
     finally:
         conn.close()

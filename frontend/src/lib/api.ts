@@ -29,3 +29,6 @@ export const runAgent = (admId: string) =>
 
 export const getDecision = (decisionId: string) =>
   request<DecisionRecord>(`/decision/${decisionId}`)
+
+export const agentWsUrl = (admId: string) =>
+  `${API_BASE.replace(/^http/, 'ws')}/ws/agent/${admId}`
