@@ -5,7 +5,7 @@ import { AdmNoticePanel } from './components/AdmNoticePanel'
 import { AgentPanel } from './components/AgentPanel'
 import { getAdm, listAdms } from './lib/api'
 import type { ADM, ADMListItem } from './lib/types'
-
+//
 function App() {
   const [admList, setAdmList] = useState<ADMListItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
