@@ -11,7 +11,7 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedAdm, setSelectedAdm] = useState<ADM | null>(null)
   const [admLoading, setAdmLoading] = useState(false)
-
+///
   useEffect(() => {
     listAdms().then((items) => {
       setAdmList(items)
